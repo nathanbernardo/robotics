@@ -1,0 +1,93 @@
+[
+  {
+    "name": "4oz",
+    "id": 19,
+    "color": "#336479",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "6oz",
+    "id": 20,
+    "color": "#791923",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "8oz",
+    "id": 21,
+    "color": "#93c662",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "10oz",
+    "id": 22,
+    "color": "#29d037",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "12oz",
+    "id": 23,
+    "color": "#92861e",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "strong",
+    "id": 24,
+    "color": "#117f94",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "iced",
+    "id": 25,
+    "color": "#55e407",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "hot",
+    "id": 26,
+    "color": "#06722b",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "add_water",
+    "id": 27,
+    "color": "#c26ff5",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "descale",
+    "id": 28,
+    "color": "#dbd8df",
+    "type": "rectangle",
+    "attributes": []
+  },
+  {
+    "name": "handle",
+    "id": 29,
+    "color": "#eb5fa9",
+    "type": "any",
+    "attributes": []
+  },
+  {
+    "name": "water bin",
+    "id": 30,
+    "color": "#469d9b",
+    "type": "any",
+    "attributes": []
+  },
+  {
+    "name": "power",
+    "id": 31,
+    "color": "#b4dbe4",
+    "type": "rectangle",
+    "attributes": []
+  }
+]
