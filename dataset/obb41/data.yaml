@@ -1,0 +1,18 @@
+Train: Data.txt
+names:
+  0: 4oz
+  1: 6oz
+  2: 8oz
+  3: 10oz
+  4: 12oz
+  5: strong
+  6: iced
+  7: hot
+  8: add_water
+  9: descale
+  10: handle
+  11: water bin
+  12: power
+path: /home/ncbernar/Code/object_detection_sandbox/util/test
+train: train/images
+val: val/images
