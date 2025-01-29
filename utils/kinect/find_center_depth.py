@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 from ultralytics import YOLO
 from freenect import DEPTH_MM
+from kinect_utils.frame_convert import pretty_depth_cv
 
 def get_depth():
     depth, _ = freenect.sync_get_depth(format=DEPTH_MM)
@@ -16,7 +17,7 @@ def get_center_depth():
     return center_depth
 
 def get_video():
-    return freenect.sync_get_video()[0];
+    return freenect.sync_get_video()[0]
 
 # Load Pretrain Yolov11 model
 model = YOLO("/home/ncbernar/.pyenv/runs/obb/train41/weights/best.pt")
