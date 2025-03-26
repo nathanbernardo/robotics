@@ -1,0 +1,23 @@
+# Train: Data.txt
+names:
+  0: 4oz
+  1: 6oz
+  2: 8oz
+  3: 10oz
+  4: 12oz
+  5: strong
+  6: iced
+  7: hot
+  8: add_water
+  9: descale
+  10: handle
+  11: water bin
+  12: power
+  13: water_handle
+  14: coffee_handle
+  15: platform
+  16: water_bucket
+  17: pod_holder
+path: /home/ncbernar/Github/robotics/dataset/2025_02_12
+train: train/images
+val: val/images
