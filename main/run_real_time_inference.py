@@ -1,4 +1,4 @@
-
+import time
 import freenect
 import numpy as np
 import cv2 as cv
@@ -120,53 +120,20 @@ class KinectProcessor:
         obb_frame = obb_results[0].plot()
         detection_frame = detection_results[0].plot()
         # combined_frame = cv.addWeighted(obb_frame, 0.9, detection_frame, 0.9, 0)
-        combined_frame = obb_results[0].plot()
+        combined_frame = detection_results[0].plot()
         # combined_frame = detection_results[0].plot(img=combined_frame)
 
-        # table = Table(title="Object Detection Results")
-        # table.add_column("Object", style="cyan")
-        # table.add_column("Center", style="magenta")
-        # table.add_column("Distance", style="green")
-        # table.add_column("Real-world Coordinates", style="yellow")
+        table = Table(title="Object Detection Results")
+        table.add_column("Object", style="cyan")
+        table.add_column("Center", style="magenta")
+        table.add_column("Distance", style="green")
+        table.add_column("Real-world Coordinates", style="yellow")
 
         # print("RESULTS: ", results[0].obb)
-        # for result in detection_results[0].boxes:
-        #     class_index = result.cls[0].item()
-        #     class_name = self.detection_labels[class_index]
-        #     x1, y1, x2, y2 = result.xyxy[0]
-        #
-        #     # Calculate center point
-        #     center_x = int((x1 + x2) / 2)
-        #     center_y = int((y1 + y2) / 2)
-        #
-        #     # Get distance based on center points
-        #     distance = self.get_center_depth(center_x, center_y)
-        #
-        #     # Draw center point on the frame
-        #     cv.circle(detection_frame, (center_x, center_y), 20, (0, 255, 0), -1)
-        #
-        #     if distance is not None:
-        #         real_x, real_y, real_z = self.get_real_world_coordinates(center_x, center_y, distance)
-        #         
-        #         table.add_row(
-        #             f"{class_name.capitalize()}",
-        #             f"({center_x}, {center_y})",
-        #             f"{distance}mm",
-        #             f"X: {real_x:.2f}mm, Y: {real_y:.2f}mm, Z: {real_z:.2f}mm"
-        #         )
-        #
-        #     else:
-        #         table.add_row(
-        #             f"Object {len(table.rows) + 1}",
-        #             f"({center_x}, {center_y})",
-        #             "N/A",
-        #             "N/A"
-        #         )
-
-        for result in obb_results[0].obb:
+        for result in detection_results[0].boxes:
             class_index = result.cls[0].item()
-            class_name = self.obb_labels[class_index]
-            x1, y1, x2, y2, _ = result.xywhr[0]
+            class_name = self.detection_labels[class_index]
+            x1, y1, x2, y2 = result.xyxy[0]
 
             # Calculate center point
             center_x = int((x1 + x2) / 2)
@@ -175,6 +142,39 @@ class KinectProcessor:
             # Get distance based on center points
             distance = self.get_center_depth(center_x, center_y)
 
+            # Draw center point on the frame
+            cv.circle(detection_frame, (center_x, center_y), 20, (0, 255, 0), -1)
+
+            if distance is not None:
+                real_x, real_y, real_z = self.get_real_world_coordinates(center_x, center_y, distance)
+                
+                table.add_row(
+                    f"{class_name.capitalize()}",
+                    f"({center_x}, {center_y})",
+                    f"{distance}mm",
+                    f"X: {real_x:.2f}mm, Y: {real_y:.2f}mm, Z: {real_z:.2f}mm"
+                )
+
+            else:
+                table.add_row(
+                    f"Object {len(table.rows) + 1}",
+                    f"({center_x}, {center_y})",
+                    "N/A",
+                    "N/A"
+                )
+
+        # for result in obb_results[0].obb:
+        #     class_index = result.cls[0].item()
+        #     class_name = self.obb_labels[class_index]
+        #     x1, y1, x2, y2, _ = result.xywhr[0]
+        #
+        #     # Calculate center point
+        #     center_x = int((x1 + x2) / 2)
+        #     center_y = int((y1 + y2) / 2)
+        #
+        #     # Get distance based on center points
+        #     distance = self.get_center_depth(center_x, center_y)
+        #
 
             # Draw center point on the frame
             # cv.circle(combined_frame, (center_x, center_y), 20, (0, 255, 0), -1)
@@ -196,7 +196,8 @@ class KinectProcessor:
         #             "N/A",
         #             "N/A"
         #         )
-        # console.print(table)
+        console.print(table)
+        # time.sleep(1)
         return combined_frame
 
 def main():
@@ -213,8 +214,6 @@ def main():
     while True:
         frame = processor.get_video()
         annotated_frame = processor.process_frame(frame)
-        results = distancecalculator.calculate(annotated_frame)
-        print("RESULTS: ", results)
 
         cv.imshow("YOLOv11 Inference", annotated_frame)
 
