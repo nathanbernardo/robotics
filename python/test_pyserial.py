@@ -17,7 +17,10 @@ def send_command(motor_index, entry):
     try:
         step_value = float(entry.get())
         values = [0.0] * 6  # Initialize step values for 6 motors
-        values[motor_index] = step_value * 3200
+        if (motor_index != 2):
+            values[motor_index] = ((step_value * 3200) / 360) * 20
+        else:
+            values[motor_index] = ((step_value * 3200) / 360) * 10
         message = struct.pack('<BB6fB', SYNC_BYTE, 6, *values, EOF_BYTE)
         arduino.write(message)
         print(f"Sent: {message}")
