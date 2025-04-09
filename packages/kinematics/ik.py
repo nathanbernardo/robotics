@@ -1,5 +1,4 @@
 import ikpy.chain
-import numpy as np
 import ikpy.utils.plot as plot_utils
 import matplotlib.pyplot as plt
 

@@ -1,7 +1,5 @@
 import freenect
-import numpy as np
 import cv2 as cv
-from freenect import VIDEO_IR_10BIT
 
 from kinect_utils.frame_convert import pretty_depth_cv
 

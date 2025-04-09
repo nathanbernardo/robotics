@@ -1,27 +1,33 @@
-import time
+import json
+import asyncio
 import freenect
 import numpy as np
 import cv2 as cv
-from ultralytics import YOLO, solutions
+from ultralytics import YOLO
 from freenect import DEPTH_MM
-from kinect_utils.frame_convert import video_cv
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from libs.kinect_utils.frame_convert import video_cv
+from libs.nats.jetstream_manager import JetStreamManager
 
 console = Console()
-distancecalculator = solutions.DistanceCalculation(
-    model="/home/ncbernar/.pyenv/runs/obb/train58/weights/best.pt",  # path to the YOLO11 model file.
-    show=True,  # display the output
-)
+
+# Define constants
+MODEL_PATHS = {
+    'detection': "/home/ncbernar/Downloads/detect_9.pt",
+    'obb': "/home/ncbernar/Downloads/obb_58.pt"
+}
+CALIBRATION_FILE = "/home/ncbernar/Code/nats_sandbox/packages/calibration/camera_calibration.npz"
 
 class KinectProcessor:
-    def __init__(self, detection_model, obb_model, calibration_file):
+    def __init__(self, detection_model, obb_model, calibration_file, js):
         self.detection_model = YOLO(detection_model)
         self.obb_model = YOLO(obb_model)
         self.detection_labels = self.detection_model.names
         self.obb_labels = self.obb_model.names
         self.load_calibration(calibration_file)
+        self.js = js
 
     def load_calibration(self, calibration_file):
         with np.load(calibration_file) as X:
@@ -71,42 +77,8 @@ class KinectProcessor:
         real_z = depth
 
         return real_x, real_y, real_z
-    
-    # def process_detections(self, results, labels, frame, table):
-    #     for result in detection_results[0].boxes:
-    #         class_index = result.cls[0].item()
-    #         class_name = self.detection_labels[class_index]
-    #         x1, y1, x2, y2 = result.xyxy[0]
-    #
-    #         # Calculate center point
-    #         center_x = int((x1 + x2) / 2)
-    #         center_y = int((y1 + y2) / 2)
-    #
-    #         # Get distance based on center points
-    #         distance = self.get_center_depth(center_x, center_y)
-    #
-    #         # Draw center point on the frame
-    #         cv.circle(detection_frame, (center_x, center_y), 5, (0, 255, 0), -1)
-    #
-    #         if distance is not None:
-    #             real_x, real_y, real_z = self.get_real_world_coordinates(center_x, center_y, distance)
-    #             
-    #             table.add_row(
-    #                 f"{class_name.capitalize()}",
-    #                 f"({center_x}, {center_y})",
-    #                 f"{distance}mm",
-    #                 f"X: {real_x:.2f}mm, Y: {real_y:.2f}mm, Z: {real_z:.2f}mm"
-    #             )
-    #
-    #         else:
-    #             table.add_row(
-    #                 f"Object {len(table.rows) + 1}",
-    #                 f"({center_x}, {center_y})",
-    #                 "N/A",
-    #                 "N/A"
-    #             )
 
-    def process_frame(self, frame):
+    async def process_frame(self, frame):
         undistorted_frame = self.undistort_frame(frame)
 
         
@@ -147,6 +119,15 @@ class KinectProcessor:
 
             if distance is not None:
                 real_x, real_y, real_z = self.get_real_world_coordinates(center_x, center_y, distance)
+                payload = {
+                    "x": float(real_x),
+                    "y": float(real_y),
+                    "z": float(real_z)
+                }
+                print(self.js)
+
+                print("Publishing data")
+                await self.js.publish("camera.collected", json.dumps(payload).encode())
                 
                 table.add_row(
                     f"{class_name.capitalize()}",
@@ -197,30 +178,35 @@ class KinectProcessor:
         #             "N/A"
         #         )
         console.print(table)
-        # time.sleep(1)
         return combined_frame
 
-def main():
-    MODEL_PATHS = {
-        'detection': "/home/ncbernar/.pyenv/runs/detect/train9/weights/best.pt",
-        'obb': "/home/ncbernar/.pyenv/runs/obb/train58/weights/best.pt"
-    }
-    CALIBRATION_FILE = "../utils/kinect/camera_calibration.npz"
-    processor = KinectProcessor(MODEL_PATHS['detection'], MODEL_PATHS['obb'], CALIBRATION_FILE)
+async def main():
+    # Connect to Nats JetStream
+    jsm =  JetStreamManager()
+    await jsm.connect()
+    js = jsm.nc.jetstream()
 
-    # Initialize distance calculation object
+    # Ensure stream exists
+    await jsm.ensure_stream(
+            "camera_events",
+            subjects=["camera.*"],
+            max_msgs=100_000,
+            )
 
-    # with 
+    # Instantiate the Kinect Processor 
+    processor = KinectProcessor(MODEL_PATHS['detection'], MODEL_PATHS['obb'], CALIBRATION_FILE, js)
+
     while True:
         frame = processor.get_video()
-        annotated_frame = processor.process_frame(frame)
+        annotated_frame = await processor.process_frame(frame)
 
         cv.imshow("YOLOv11 Inference", annotated_frame)
 
         if cv.waitKey(1) & 0xFF == ord('q'):
-            break;
+            break
 
     cv.destroyAllWindows()
+    await jsm.shutdown()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

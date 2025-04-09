@@ -29,7 +29,7 @@ def process_video(input_video_path):
         while input_video.isOpened():
             ret, frame = input_video.read()
             if not ret:
-                break;
+                break
 
             gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
             h, w = frame.shape[:2]
