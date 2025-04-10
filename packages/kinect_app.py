@@ -1,14 +1,11 @@
 import asyncio
 import cv2 as cv
+from config.config import MinioConfig
 from libs.nats.jetstream_manager import JetStreamManager
 from libs.kinect_utils.kinect_processor import KinectProcessor
 from libs.minio_utils.minio_client import MinioClient
 
 # Define constants
-MODEL_PATHS = {
-    "detection": "/home/ncbernar/Downloads/detect_9.pt",
-    "obb": "/home/ncbernar/Downloads/obb_58.pt",
-}
 CALIBRATION_FILE = (
     "/home/ncbernar/Code/nats_sandbox/packages/calibration/camera_calibration.npz"
 )
@@ -17,12 +14,17 @@ CALIBRATION_FILE = (
 async def main():
     # Fetch detection models from Minio
     minio_client = MinioClient(
-        endpoint="localhost:9000", access_key="dev", secret_key="dev-minio"
+        endpoint=MinioConfig.SERVER,
+        access_key=MinioConfig.ACCESS_KEY,
+        secret_key=MinioConfig.SECRET_KEY,
     )
 
-    model_path = "./tmp/detect_9.pt"
-    detection_model = minio_client.download_file("ai-models", "detect_9.pt", model_path)
-    print(detection_model)
+    detection_path = "./tmp/detect_coco128_200epochs.pt"
+    obb_path = "./tmp/obb_58.pt"
+    minio_client.download_file(
+        "ai-models", "detect_coco128_200epochs.pt", detection_path
+    )
+    minio_client.download_file("ai-models", "obb_58.pt", obb_path)
 
     # Connect to Nats JetStream
     jsm = JetStreamManager()
@@ -37,7 +39,7 @@ async def main():
     )
 
     # Instantiate the Kinect Processor
-    processor = KinectProcessor(model_path, MODEL_PATHS["obb"], CALIBRATION_FILE, js)
+    processor = KinectProcessor(detection_path, obb_path, CALIBRATION_FILE, js)
 
     while True:
         frame = processor.get_video()

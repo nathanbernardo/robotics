@@ -1,2 +1,67 @@
-.env
 /tmp
+# Byte-compiled files
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.env.bak/
+.venv/
+
+# Environment variable files
+*.env
+*.env.*
+
+# Package build artifacts
+build/
+dist/
+*.egg-info/
+*.eggs/
+*.manifest
+
+# PyInstaller
+*.spec
+
+# Logs
+*.log
+
+# Testing
+.coverage
+.tox/
+htmlcov/
+nosetests.xml
+coverage.xml
+pytest_cache/
+.pytest_cache/
+
+# MyPy / Pyre / Pytype
+.mypy_cache/
+.pyre/
+.pytype/
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# JetBrains IDEs
+*.iml
+*.ipr
+*.iws
+out/
+
+# Pydantic compiled schema cache (if using pydantic v2)
+.pydantic/
+
+# NATS JetStream
+*.consumer

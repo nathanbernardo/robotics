@@ -35,7 +35,7 @@ class KinectProcessor:
     def get_center_depth(cls, center_x, center_y):
         depth_map = cls.get_depth()
         height, width = depth_map.shape
-        print(f"[get_center_depth] (height, width): ({height}, {width})")
+
         if 0 <= center_x < width and 0 <= center_y < height:
             center_depth = depth_map[center_y, center_x]
             return center_depth
@@ -93,7 +93,6 @@ class KinectProcessor:
         table.add_column("Distance", style="green")
         table.add_column("Real-world Coordinates", style="yellow")
 
-        # print("RESULTS: ", results[0].obb)
         for result in detection_results[0].boxes:
             class_index = result.cls[0].item()
             class_name = self.detection_labels[class_index]
@@ -114,9 +113,7 @@ class KinectProcessor:
                     center_x, center_y, distance
                 )
                 payload = {"x": float(real_x), "y": float(real_y), "z": float(real_z)}
-                print(self.js)
 
-                print("Publishing data")
                 await self.js.publish("camera.collected", json.dumps(payload).encode())
 
                 table.add_row(
