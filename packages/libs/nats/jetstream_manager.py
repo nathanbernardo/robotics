@@ -1,7 +1,14 @@
+from typing import Optional
 from nats import connect, errors
 from nats.aio.client import Client as NATS
 from nats.js import JetStreamContext
-from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy, StreamConfig
+from nats.js.api import (
+    AckPolicy,
+    ConsumerConfig,
+    DeliverPolicy,
+    ReplayPolicy,
+    StreamConfig,
+)
 
 
 class JetStreamManager:
@@ -16,7 +23,13 @@ class JetStreamManager:
         self.js = self.nc.jetstream()
         return self.js
 
-    async def ensure_stream(self, stream_name: str, subjects: list, **kwargs):
+    async def ensure_stream(
+        self,
+        stream_name: str,
+        subjects: list,
+        max_msgs: Optional[int] = 100_000,
+        **kwargs,
+    ):
         if self.js is None:
             raise RuntimeError("Jetstream not initialized")
 
@@ -25,7 +38,8 @@ class JetStreamManager:
             config = StreamConfig(
                 name=stream_name,
                 subjects=subjects,
-                **{**stream.config.dict(), **kwargs}
+                max_msgs=max_msgs,
+                **{**stream.config.dict(), **kwargs},
             )
             return await self.js.update_stream(config)
         except:
@@ -36,22 +50,32 @@ class JetStreamManager:
         self,
         subject: str,
         stream_name: str,
-        consumer_name: str,
-        description: str,
-        ack_policy: AckPolicy = AckPolicy.EXPLICIT,
-        deliver_policy: DeliverPolicy = DeliverPolicy.ALL,
+        durable_name: str,
+        description: Optional[str],
+        ack_policy: Optional[AckPolicy] = AckPolicy.EXPLICIT,
+        deliver_policy: Optional[DeliverPolicy] = DeliverPolicy.ALL,
+        replay_policy: Optional[ReplayPolicy] = ReplayPolicy.INSTANT,
+        flow_control: Optional[bool] = True,
+        max_deliver: Optional[int] = 1,
+        heartbeat: Optional[float] = 5_000_000_000,
     ):
         if self.js is None:
             raise RuntimeError("Jetstream not intialized")
 
+        # References: https://docs.nats.io/nats-concepts/jetstream/consumers
         config = ConsumerConfig(
-            durable_name=consumer_name,
+            durable_name=durable_name,
             ack_policy=ack_policy,
             deliver_policy=deliver_policy,
             description=description,
+            replay_policy=replay_policy,
+            flow_control=flow_control,
+            max_deliver=max_deliver,
+            idle_heartbeat=heartbeat,
         )
+
         return await self.js.pull_subscribe(
-            stream=stream_name, subject=subject, config=config, durable=consumer_name
+            stream=stream_name, subject=subject, config=config, durable=durable_name
         )
 
     async def shutdown(self):

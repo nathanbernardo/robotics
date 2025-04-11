@@ -13,13 +13,12 @@ console = Console()
 
 
 class KinectProcessor:
-    def __init__(self, detection_model, obb_model, calibration_file, js):
+    def __init__(self, detection_model, obb_model, calibration_file):
         self.detection_model = YOLO(detection_model)
         self.obb_model = YOLO(obb_model)
         self.detection_labels = self.detection_model.names
         self.obb_labels = self.obb_model.names
         self.load_calibration(calibration_file)
-        self.js = js
 
     def load_calibration(self, calibration_file):
         with np.load(calibration_file) as X:
@@ -83,8 +82,8 @@ class KinectProcessor:
         # Create combined annotations
         obb_frame = obb_results[0].plot()
         detection_frame = detection_results[0].plot()
-        # combined_frame = cv.addWeighted(obb_frame, 0.9, detection_frame, 0.9, 0)
-        combined_frame = detection_results[0].plot()
+        combined_frame = cv.addWeighted(obb_frame, 0.9, detection_frame, 0.9, 0)
+        # combined_frame = detection_results[0].plot()
         # combined_frame = detection_results[0].plot(img=combined_frame)
 
         table = Table(title="Object Detection Results")
@@ -114,7 +113,7 @@ class KinectProcessor:
                 )
                 payload = {"x": float(real_x), "y": float(real_y), "z": float(real_z)}
 
-                await self.js.publish("camera.collected", json.dumps(payload).encode())
+                # await self.js.publish("camera.collected", json.dumps(payload).encode())
 
                 table.add_row(
                     f"{class_name.capitalize()}",
@@ -142,7 +141,6 @@ class KinectProcessor:
         #
         #     # Get distance based on center points
         #     distance = self.get_center_depth(center_x, center_y)
-        #
 
         # Draw center point on the frame
         # cv.circle(combined_frame, (center_x, center_y), 20, (0, 255, 0), -1)
