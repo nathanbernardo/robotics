@@ -17,3 +17,9 @@ run-publisher:
 
 run-image-generator:
 	python packages/libs/ob_utils/image_generator.py $(ARGS)
+
+run-train-model:
+	python packages/train_model.py
+
+run-take-pictures:
+	python packages/take_pictures.py

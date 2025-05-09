@@ -51,7 +51,7 @@ class JetStreamManager:
         subject: str,
         stream_name: str,
         durable_name: str,
-        description: Optional[str],
+        description: Optional[str] = "",
         ack_policy: Optional[AckPolicy] = AckPolicy.EXPLICIT,
         deliver_policy: Optional[DeliverPolicy] = DeliverPolicy.ALL,
         replay_policy: Optional[ReplayPolicy] = ReplayPolicy.INSTANT,
@@ -69,9 +69,9 @@ class JetStreamManager:
             deliver_policy=deliver_policy,
             description=description,
             replay_policy=replay_policy,
-            flow_control=flow_control,
+            # flow_control=flow_control, push specific
             max_deliver=max_deliver,
-            idle_heartbeat=heartbeat,
+            # idle_heartbeat=heartbeat, push specific
         )
 
         return await self.js.pull_subscribe(

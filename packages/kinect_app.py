@@ -1,17 +1,22 @@
 import asyncio
+import time
 import cv2 as cv
-from config.config import MinioConfig
+from config.config import MinioConfig, ModelConfig
 from libs.nats.jetstream_manager import JetStreamManager
-from libs.kinect_utils.kinect_processor import KinectProcessor
+from libs.kinect_utils.kinect_processor import CameraCalibrator, KinectProcessor
 from libs.minio_utils.minio_client import MinioClient
 
-# Define constants
-CALIBRATION_FILE = (
-    "/home/ncbernar/Code/nats_sandbox/packages/calibration/camera_calibration.npz"
-)
+
+async def setup_nats():
+    jsm = JetStreamManager()
+    await jsm.connect()
+    await jsm.ensure_stream("camera_events", subjects=["camera.*"], max_msgs=100_100)
+    return jsm
 
 
 async def main():
+    # jsm = await setup_nats()
+
     # Fetch detection models from Minio
     minio_client = MinioClient(
         endpoint=MinioConfig.SERVER,
@@ -19,39 +24,42 @@ async def main():
         secret_key=MinioConfig.SECRET_KEY,
     )
 
-    detection_path = "./tmp/detect_coco128_200epochs.pt"
-    obb_path = "./tmp/obb_58.pt"
-    minio_client.download_file(
-        "ai-models", "detect_coco128_200epochs.pt", detection_path
-    )
-    minio_client.download_file("ai-models", "obb_58.pt", obb_path)
+    detection_path = ModelConfig.DETECTION_MODEL_PATH
+    obb_model = ModelConfig.OBB_MODEL
+    obb_path = ModelConfig.OBB_MODEL_PATH
 
-    # Connect to Nats JetStream
-    jsm = JetStreamManager()
-    await jsm.connect()
-    js = jsm.nc.jetstream()
+    minio_client.download_file("ai-models", obb_model, obb_path)
 
-    # Ensure stream exists
-    await jsm.ensure_stream(
-        "camera_events",
-        subjects=["camera.*"],
-        max_msgs=100_000,
-    )
-
+    print("Downloaded file")
     # Instantiate the Kinect Processor
-    processor = KinectProcessor(detection_path, obb_path, CALIBRATION_FILE, js)
-
-    while True:
-        frame = processor.get_video()
-        annotated_frame = await processor.process_frame(frame)
-
-        cv.imshow("YOLOv11 Inference", annotated_frame)
-
-        if cv.waitKey(1) & 0xFF == ord("q"):
-            break
-
+    calibrator = CameraCalibrator(ModelConfig.CALIBRATION_FILE)
+    processor = KinectProcessor(detection_path, obb_path, calibrator)
     cv.destroyAllWindows()
-    await jsm.shutdown()
+    print("Attempting to run model")
+
+    try:
+        target_fps = 30
+        frame_time = 1 / target_fps
+        while True:
+            start_time = time.time()
+            frame = processor.get_video()
+            if frame is None:
+                break
+
+            annotated_frame = await processor.process_frame(frame)
+            cv.imshow("YOLOv11 Inference", annotated_frame)
+            if cv.getWindowProperty("YOLOv11 Inference", cv.WND_PROP_VISIBLE) < 1:
+                break
+
+            if cv.waitKey(1) & 0xFF == ord("q"):
+                print("Stopping sync")
+                break
+            elapsed = time.time() - start_time
+            await asyncio.sleep(max(0, frame_time - elapsed))
+    finally:
+        processor.stop_video()
+        cv.destroyAllWindows()
+        # await jsm.shutdown()
 
 
 if __name__ == "__main__":

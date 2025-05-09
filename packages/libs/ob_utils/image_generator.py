@@ -1,4 +1,4 @@
-import torchvision.transforms as transforms
+import typer
 import uuid
 import torch
 import os
@@ -31,16 +31,25 @@ def parse_arguments() -> argparse.Namespace:
         "--num_augmentations",
         type=int,
         default=50,
-        help="Number of agumentations per image",
+        help="(Default: 50). Number of agumentations per image.",
     )
     parser.add_argument(
-        "--train_ratio", type=float, default=0.7, help="Ratio of training set"
+        "--train_ratio",
+        type=float,
+        default=0.7,
+        help="(Default: 0.7). Ratio of training set.",
     )
     parser.add_argument(
-        "--val_ratio", type=float, default=0.15, help="Ratio of validation set"
+        "--val_ratio",
+        type=float,
+        default=0.15,
+        help="(Default: 0.15). Ratio of validation set.",
     )
     parser.add_argument(
-        "--test_ratio", type=float, default=0.15, help="Ratio of test set"
+        "--test_ratio",
+        type=float,
+        default=0.15,
+        help="(Default: 0.15). Ratio of test set.",
     )
 
     return parser.parse_args()
@@ -49,26 +58,26 @@ def parse_arguments() -> argparse.Namespace:
 def create_albumentations_transform() -> A.Compose:
     return A.Compose(
         [
-            A.HorizontalFlip(p=0.5),
-            A.Affine(
-                rotate=(-15, 15), scale=(0.9, 1.1), translate_percent=(-0.1, 0.1), p=0.5
-            ),
-            A.ToGray(p=0.1),
-            A.GaussNoise((0.1, 0.5), p=0.3),
+            # A.HorizontalFlip(p=0.5),
+            # A.Affine(
+            #     rotate=(-15, 15), scale=(0.9, 1.1), translate_percent=(-0.1, 0.1), p=0.5
+            # ),
+            # A.ToGray(p=0.1),
+            # A.GaussNoise((0.05, 0.1), p=0.3),
             A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
-            A.RandomResizedCrop(
-                (640, 640), (0.8, 1.0), p=0.4
-            ),  # Keep close to original size
-            A.Resize(height=640, width=640),  # Ensure 640x640 for YOLO
-            A.Rotate((-30, 90), p=0.5),
-            A.VerticalFlip(p=0.3),
-            A.HueSaturationValue(
-                hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3
-            ),
+            # A.RandomResizedCrop(
+            #     (640, 640), (0.8, 1.0), p=0.4
+            # ),  # Keep close to original size
+            A.Resize(height=480, width=640),  # Ensure 640x480 for YOLO
+            # A.Rotate((-30, 90), p=0.5),
+            # A.VerticalFlip(p=0.3),
+            # A.HueSaturationValue(
+            #     hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3
+            # ),
             A.Blur(blur_limit=3, p=0.2),
-            A.CoarseDropout(
-                (8, 8), hole_height_range=(32, 32), hole_width_range=(32, 32), p=0.3
-            ),
+            # A.CoarseDropout(
+            #     (8, 8), hole_height_range=(32, 32), hole_width_range=(32, 32), p=0.3
+            # ),
         ]
     )
 
