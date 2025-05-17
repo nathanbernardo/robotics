@@ -36,8 +36,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--train_ratio",
         type=float,
-        default=0.7,
-        help="(Default: 0.7). Ratio of training set.",
+        default=0.8,
+        help="(Default: 0.8). Ratio of training set.",
     )
     parser.add_argument(
         "--val_ratio",
@@ -48,8 +48,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--test_ratio",
         type=float,
-        default=0.15,
-        help="(Default: 0.15). Ratio of test set.",
+        default=0.05,
+        help="(Default: 0.05). Ratio of test set.",
     )
 
     return parser.parse_args()
@@ -64,7 +64,7 @@ def create_albumentations_transform() -> A.Compose:
             # ),
             # A.ToGray(p=0.1),
             # A.GaussNoise((0.05, 0.1), p=0.3),
-            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.0, p=0.4),
             # A.RandomResizedCrop(
             #     (640, 640), (0.8, 1.0), p=0.4
             # ),  # Keep close to original size
@@ -74,7 +74,7 @@ def create_albumentations_transform() -> A.Compose:
             # A.HueSaturationValue(
             #     hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3
             # ),
-            A.Blur(blur_limit=3, p=0.2),
+            # A.Blur(blur_limit=3, p=0.2),
             # A.CoarseDropout(
             #     (8, 8), hole_height_range=(32, 32), hole_width_range=(32, 32), p=0.3
             # ),
