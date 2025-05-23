@@ -30,12 +30,10 @@ async def main():
 
     minio_client.download_file("ai-models", obb_model, obb_path)
 
-    print("Downloaded file")
     # Instantiate the Kinect Processor
     calibrator = CameraCalibrator(ModelConfig.CALIBRATION_FILE)
     processor = KinectProcessor(detection_path, obb_path, calibrator)
     cv.destroyAllWindows()
-    print("Attempting to run model")
 
     try:
         target_fps = 30
@@ -46,10 +44,13 @@ async def main():
             if frame is None:
                 break
 
-            annotated_frame = await processor.process_frame(frame)
+            # annotated_frame = await processor.process_frame(frame)
+            refined_frame = await processor.process_frame(frame)
+            annotated_frame = processor.detect_objects(refined_frame)
+
             cv.imshow("YOLOv11 Inference", annotated_frame)
-            if cv.getWindowProperty("YOLOv11 Inference", cv.WND_PROP_VISIBLE) < 1:
-                break
+            # if cv.getWindowProperty("YOLOv11 Inference", cv.WND_PROP_VISIBLE) < 1:
+            #     break
 
             if cv.waitKey(1) & 0xFF == ord("q"):
                 print("Stopping sync")

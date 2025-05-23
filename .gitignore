@@ -1,6 +1,7 @@
 /tmp
 # Byte-compiled files
-__pycache__/
+# __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.pyc
@@ -68,3 +69,4 @@ out/
 
 # NATS JetStream
 *.consumer
+

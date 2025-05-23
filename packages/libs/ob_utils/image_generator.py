@@ -90,6 +90,9 @@ def generate_unique_filename(original_filename: str, counter: int) -> str:
 def augment_keurig_image(
     input_dir: Path, output_dir: Path, num_images: int
 ) -> Dict[str, List[torch.Tensor]]:
+    # Create output directory if it doesn't exist
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     # Define augmentation transforms
     transform = create_albumentations_transform()
 
