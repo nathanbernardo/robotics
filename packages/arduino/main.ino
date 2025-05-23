@@ -16,14 +16,22 @@
 #define Z_MIN_PIN          18
 #define Z_MAX_PIN          19
 
+#define E0_STEP_PIN        26
+#define E0_DIR_PIN         28
+#define E0_ENABLE_PIN      24
+
+#define DM556T_PULSE       16
+#define DM556T_DIR         17
+#define DM542_PULSE        23
+#define DM542_DIR          25
+#define SERVO_DRIVER_SCC   27
+#define SERVO_DRIVER_SDA   29
+
 #define LIMIT_PIN       51
 
 #define ONE_REVOLUTION     800*4
 
 #include <AccelStepper.h>
-#include <ezButton.h>
-
-ezButton limitSwitch(LIMIT_PIN);
 
 enum ParsingState {
   LOOKING_FOR_SYNC_BYTE,
@@ -42,35 +50,38 @@ float actuatorPosition6;
 
 // Define the stepper motor and the pins that is connected to
 AccelStepper stepper1(1, X_STEP_PIN, X_DIR_PIN); // (Type of driver: with 2 pins, STEP, DIR)
-AccelStepper stepper2(1, Y_STEP_PIN, Y_DIR_PIN); // (Type of driver: with 2 pins, STEP, DIR)
-AccelStepper stepper3(1, Z_STEP_PIN, Z_DIR_PIN); // (Type of driver: with 2 pins, STEP, DIR)
+AccelStepper stepper2(1, E0_STEP_PIN, E0_DIR_PIN); // (Type of driver: with 2 pins, STEP, DIR)
+AccelStepper stepper3(1, Y_STEP_PIN, Y_DIR_PIN); // (Type of driver: with 2 pins, STEP, DIR)
+AccelStepper baseStepper(1, Z_STEP_PIN, Z_DIR_PIN);
 
 void setup() {
   Serial.begin(9600);
   parsingState = LOOKING_FOR_SYNC_BYTE;
 
   pinMode(X_ENABLE_PIN    , OUTPUT);
-  pinMode(Y_ENABLE_PIN    , OUTPUT);
+  pinMode(E0_ENABLE_PIN    , OUTPUT);
   pinMode(Z_ENABLE_PIN    , OUTPUT);
   // Set maximum speed value for the stepper
-  stepper1.setMaxSpeed(500);
-  stepper1.setAcceleration(500);
+  stepper1.setMaxSpeed(200);
+  stepper1.setAcceleration(400);
   stepper1.setCurrentPosition(0);
 
-  stepper2.setMaxSpeed(1000);
-  stepper2.setAcceleration(1000);
+  stepper2.setMaxSpeed(200);
+  stepper2.setAcceleration(200);
   stepper2.setCurrentPosition(0);
 
-  stepper3.setMaxSpeed(500);
-  stepper3.setAcceleration(500);
+  stepper3.setMaxSpeed(200);
+  stepper3.setAcceleration(200);
   stepper3.setCurrentPosition(0);
 
-  limitSwitch.setDebounceTime(50); // set debounce time to 50 milliseconds
+  baseStepper.setMaxSpeed(200);
+  baseStepper.setAcceleration(200);
+  baseStepper.setCurrentPosition(0);
+
 }
 
 void loop() {
-  limitSwitch.loop();
- 
+
   ////////////////////////////////////////
   ////// LOOK FOR ACTUATOR MESSAGE ///////
   ////////////////////////////////////////
@@ -100,11 +111,11 @@ void loop() {
         {
           if (uh < 0)
           {
-            stepper1.setMaxSpeed(-500);
+            stepper1.setMaxSpeed(-400);
           }
           else
           {
-            stepper1.setMaxSpeed(500);
+            stepper1.setMaxSpeed(400);
           }
           stepper1.run();
         }
@@ -115,9 +126,9 @@ void loop() {
         while(abs(stepper2.distanceToGo()) > 0)
         {
           if (uh < 0)
-            stepper2.setSpeed(-800);
+            stepper2.setSpeed(-200);
           else
-            stepper2.setSpeed(800);
+            stepper2.setSpeed(200);
             stepper2.run();
           
         }
@@ -125,14 +136,14 @@ void loop() {
 
       if (iter == 2)
       {
-        stepper3.move(uh);
-        while(abs(stepper3.distanceToGo()) > 0)
+        baseStepper.move(uh);
+        while(abs(baseStepper.distanceToGo()) > 0)
         {
           if (uh < 0)
-            stepper3.setSpeed(-500);
+            baseStepper.setSpeed(-200);
           else
-            stepper3.setSpeed(500);
-          stepper3.run();
+            baseStepper.setSpeed(200);
+          baseStepper.run();
         }
       }
 
