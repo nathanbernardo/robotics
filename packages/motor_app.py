@@ -7,7 +7,7 @@ SYNC_BYTE = 0xAA
 EOF_BYTE = 0xFF
 values = [0.0] * 6  # Initialize step values for 6 motors
 
-arduino = serial.Serial('COM4')
+arduino = serial.Serial('/dev/cu.usbmodem1301')
 arduino.baudrate = 9600
 arduino.parity = 'N'
 arduino.stopbits = 1
@@ -17,8 +17,17 @@ def send_command(motor_index, entry):
     try:
         step_value = float(entry.get())
         values = [0.0] * 6  # Initialize step values for 6 motors
-        if (motor_index != 2):
+        if (motor_index == 0):
+            # negative is clockwise
+            values[motor_index] = ((step_value * 200) / 360) * 10
+        elif (motor_index == 1 or motor_index == 2):
             values[motor_index] = ((step_value * 3200) / 360) * 20
+        elif (motor_index == 3):
+            # negative is clockwise
+            values[motor_index] = ((step_value * 200) / 360) * 20
+        elif (motor_index == 5 or motor_index == 4):
+            # positive is clockwise
+            values[motor_index] = ((step_value * 200) / 360) * 21
         else:
             values[motor_index] = ((step_value * 3200) / 360) * 10
         message = struct.pack('<BB6fB', SYNC_BYTE, 6, *values, EOF_BYTE)
