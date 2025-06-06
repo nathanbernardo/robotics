@@ -1,6 +1,7 @@
 from datetime import time
 import json
 import freenect
+from nats.js import JetStreamManager
 import numpy as np
 import cv2 as cv
 from ultralytics import YOLO
@@ -13,18 +14,22 @@ import time
 
 console = Console()
 
+# Type aliases for clarity
+ImageFrame = np.ndarray
+DepthMap = np.ndarray
+
 
 class CameraCalibrator:
-    def __init__(self, calibration_file):
+    def __init__(self, calibration_file: str) -> None:
         self.load_calibration(calibration_file)
 
-    def load_calibration(self, calibration_file):
+    def load_calibration(self, calibration_file: str) -> None:
         with np.load(calibration_file) as X:
             self.mtx, self.dist = X["mtx"], X["dist"]
         console.print(Panel("[bold green]Calibration loaded successfully[/bold green]"))
-        time.sleep(10)
+        time.sleep(2)
 
-    def undistort_frame(self, frame):
+    def undistort_frame(self, frame: ImageFrame) -> ImageFrame:
         h, w = frame.shape[:2]
         newCameraMtx, roi = cv.getOptimalNewCameraMatrix(
             self.mtx, self.dist, (w, h), 1, (w, h)
@@ -47,7 +52,7 @@ class KinectProcessor:
         calibrator: CameraCalibrator,
         sharpen_method: str = "kernel",
         denoise_method: str = "median",
-    ):
+    ) -> None:
         self.detection_model = YOLO(detection_model)
         self.obb_model: YOLO = YOLO(obb_model)
         self.detection_labels = self.detection_model.names
@@ -57,30 +62,29 @@ class KinectProcessor:
         self.denoise_method = denoise_method
 
     @staticmethod
-    def get_depth():
+    def get_depth() -> DepthMap:
         depth, _ = freenect.sync_get_depth(format=DEPTH_MM)
         return depth
 
     @staticmethod
-    def get_video():
+    def get_video() -> ImageFrame:
         return video_cv(freenect.sync_get_video()[0])
 
     @staticmethod
-    def stop_video():
+    def stop_video() -> None:
         freenect.sync_stop()
 
     @classmethod
-    def get_center_depth(cls, center_x, center_y):
+    def get_center_depth(cls, center_x, center_y) -> float:
         depth_map = cls.get_depth()
         height, width = depth_map.shape
 
         if 0 <= center_x < width and 0 <= center_y < height:
-            center_depth = depth_map[center_y, center_x]
-            return center_depth
+            return float(depth_map[center_y, center_x])
         else:
-            return None
+            return 0.0
 
-    def denoise_frame(self, frame):
+    def denoise_frame(self, frame) -> ImageFrame:
         if self.denoise_method == "bilateral":
             return cv.bilateralFilter(frame, d=1, sigmaColor=75, sigmaSpace=75)
         elif self.denoise_method == "nlmeans":
@@ -92,7 +96,7 @@ class KinectProcessor:
         elif self.denoise_method == "none":
             return frame
         else:
-            return ValueError(
+            raise ValueError(
                 "Invalid denoise_method. Use 'bilateral', 'nlmeans', or 'non'"
             )
 
@@ -162,81 +166,57 @@ class KinectProcessor:
 
         return cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
 
-    async def process_frame(self, frame):
+    def enhance_hdr(self, frame):
+        lab = cv.cvtColor(frame, cv.COLOR_BGR2LAB)
+        le, a, b = cv.split(lab)
+        clahe = cv.createCLAHE(clipLimit=10.0, tileGridSize=(4, 4))
+        le = clahe.apply(le)
+        lab = cv.merge((le, a, b))
+        return cv.cvtColor(lab, cv.COLOR_LAB2BGR)
+
+    def process_frame(self, frame):
         # Undistory frame
         undistorted_frame = self.calibrator.undistort_frame(frame)
 
-        # intensify_image
-        intensified_image = self.intensify_image(undistorted_frame)
+        # Enhance image
+        enhance_hdr = self.enhance_hdr(undistorted_frame)
+        # # Contrast frame
+        # constrated_frame = self.contrast_image(undistorted_frame)
+        #
+        # # Sharpen frame
+        # sharpened_frame = self.sharpen_frame(constrated_frame)
 
-        # # # Run both models
-        # obb_results = self.obb_model(intensified_image)
-        #
-        # obb_frame = obb_results[0].plot(font_size=1)
-        #
-        # table = Table(title="Object Detection Results")
-        # table.add_column("Object", style="cyan")
-        # table.add_column("Center", style="magenta")
-        # table.add_column("Distance", style="green")
-        # table.add_column("Real-world Coordinates", style="yellow")
-        # for result in obb_results[0].obb:
-        #     class_index = result.cls[0].item()
-        #     class_name = self.obb_labels[class_index]
-        #     x1, y1, x2, y2, rotation = result.xywhr[0]
-        #
-        #     # Calculate center point
-        #     center_x = int((x1 + x2) / 2)
-        #     center_y = int((y1 + y2) / 2)
-        #
-        #     # Get distance based on center points
-        #     distance = self.get_center_depth(center_x, center_y)
-        #
-        #     # Draw center point on the frame
-        #     # cv.circle(obb_frame, (center_x, center_y), 20, (0, 255, 0), -1)
-        #
-        #     if distance is not None:
-        #         real_x, real_y, real_z = self.get_real_world_coordinates(
-        #             center_x, center_y, distance
-        #         )
-        #
-        #         #         # # Publish data to NATS
-        #         #         # payload = {"x": float(real_x), "y": float(real_y), "z": float(real_z)}
-        #         #         #
-        #         #         # await self.js.publish("camera.collected", json.dumps(payload).encode())
-        #         #
-        #         table.add_row(
-        #             f"{class_name.capitalize()}",
-        #             f"({center_x}, {center_y})",
-        #             f"{distance}mm",
-        #             f"X: {real_x:.2f}mm, Y: {real_y:.2f}mm, Z: {real_z:.2f}mm",
-        #         )
-        #
-        #     else:
-        #         table.add_row(
-        #             f"Object {len(table.rows) + 1}",
-        #             f"({center_x}, {center_y})",
-        #             "N/A",
-        #             "N/A",
-        #         )
-        # console.print(table)
-        return intensified_image
+        # Intensify_image
+        # intensified_image = self.intensify_image(undistorted_frame)
+
+        return enhance_hdr
 
     def detect_objects(self, frame):
+
+        obb_results = self.obb_model(frame)
+        obb_frame = obb_results[0].plot(font_size=1)
+
+        # # Publish data to NATS
+        # payload = {"x": float(real_x), "y": float(real_y), "z": float(real_z)}
+        #
+        # await self.js.publish("camera.collected", json.dumps(payload).encode())
+
+        return obb_results, obb_frame
+
+    def calculate_real_world_coordinates(self, obb_results):
         table = Table(title="Object Detection Results")
         table.add_column("Object", style="cyan")
         table.add_column("Center", style="magenta")
         table.add_column("Distance", style="green")
         table.add_column("Real-world Coordinates", style="yellow")
 
-        obb_results = self.obb_model(frame)
-        obb_frame = obb_results[0].plot(font_size=1)
+        object_coord_info = {}
 
         for result in obb_results[0].obb:
+
             class_index = result.cls[0].item()
             class_name = self.obb_labels[class_index]
             x1, y1, x2, y2, rotation = result.xywhr[0]
-
-            print("Rotation: ", rotation)
 
             # Calculate center point
             center_x = int((x1 + x2) / 2)
@@ -248,29 +228,39 @@ class KinectProcessor:
             # Draw center point on the frame
             # cv.circle(obb_frame, (center_x, center_y), 20, (0, 255, 0), -1)
 
-            if distance is not None:
-                real_x, real_y, real_z = self.get_real_world_coordinates(
-                    center_x, center_y, distance
-                )
+            real_x, real_y, real_z = self.get_real_world_coordinates(
+                center_x, center_y, distance
+            )
 
-                # # Publish data to NATS
-                # payload = {"x": float(real_x), "y": float(real_y), "z": float(real_z)}
-                #
-                # await self.js.publish("camera.collected", json.dumps(payload).encode())
+            # coord_data = {
+            #
+            #     "class_name": class_name,
+            #     "center": (center_x, center_y),
+            #     "distance_mm": float(distance),
+            #     "real_world_coords": {
+            #         "x_mm": float(real_x),
+            #         "y_mm": float(real_y),
+            #         "z_mm": float(real_z),
+            #     },
+            # }
+            coord_data = [float(real_x), float(real_y), float(real_z)]
 
-                table.add_row(
-                    f"{class_name.capitalize()}",
-                    f"({center_x}, {center_y})",
-                    f"{distance}mm",
-                    f"X: {real_x:.2f}mm, Y: {real_y:.2f}mm, Z: {real_z:.2f}mm",
-                )
+            object_coord_info[class_name] = np.array(coord_data)
 
-            else:
-                table.add_row(
-                    f"Object {len(table.rows) + 1}",
-                    f"({center_x}, {center_y})",
-                    "N/A",
-                    "N/A",
-                )
+            encoded_data = json.dumps(coord_data).encode()
+
+            # await self.js.publish("camera.collected", encoded_data)
+            # await send_coordinates(self, coord_data)
+
+            table.add_row(
+                f"{class_name.capitalize()}",
+                f"({center_x}, {center_y})",
+                f"{distance}mm",
+                f"X: {real_x:.2f}mm, Y: {real_y:.2f}mm, Z: {real_z:.2f}mm",
+            )
+
         console.print(table)
-        return obb_frame
+        return object_coord_info
+
+    # async def send_coordinates(self, coordinates):
+    #     await self.js.publish("camera.collected", json.dumps(coordinates).encode())
