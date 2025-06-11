@@ -4,7 +4,11 @@ import cv2 as cv
 import json
 from config.config import MinioConfig, ModelConfig
 from libs.nats.jetstream_manager import JetStreamManager
-from libs.kinect_utils.kinect_processor import CameraCalibrator, KinectProcessor
+from libs.kinect_utils.kinect_processor import (
+    CameraCalibrator,
+    DepthProcessor,
+    KinectProcessor,
+)
 from libs.minio_utils.minio_client import MinioClient
 from libs.state_machine.state_machine import State, StateMachine
 
@@ -36,7 +40,8 @@ async def main():
 
     # Instantiate the Kinect Processor
     calibrator = CameraCalibrator(ModelConfig.CALIBRATION_FILE)
-    processor = KinectProcessor(detection_path, obb_path, calibrator)
+    depth_processor = DepthProcessor()
+    kinect_processor = KinectProcessor(detection_path, obb_path, calibrator)
     cv.destroyAllWindows()
 
     try:
@@ -47,24 +52,28 @@ async def main():
         frame_time = 1 / target_fps
         while True:
             start_time = time.time()
-            frame = processor.get_video()
+            frame = depth_processor.get_video()
             if frame is None:
                 break
 
             # annotated_frame = await processor.process_frame(frame)
-            refined_frame = await processor.process_frame(frame)
-            obb_results, annotated_frame = processor.detect_objects(refined_frame)
+            refined_frame = kinect_processor.process_frame(frame)
+            obb_results, annotated_frame = kinect_processor.detect_objects(
+                refined_frame
+            )
 
             current_sm_state = state_machine.get_current_state()
             if current_sm_state == State.CALIBRATING:
-                real_world_coordinates = processor.calculate_real_world_coordinates(
-                    obb_results
+                print("Calculatin real world coordinates...")
+                real_world_coordinates = (
+                    kinect_processor.calculate_real_world_coordinates(obb_results)
                 )
+                print("Asking for coordinate data...")
                 state_machine.ask_for_coord_data(real_world_coordinates)
                 print("Real world coordinates: ", real_world_coordinates)
-
+            #
             await state_machine.transition()
-
+            #
             #
             # # Publis data to NATS
             # encoded_payload = json.dumps(real_world_coordinates).encode()
@@ -81,7 +90,7 @@ async def main():
             # await asyncio.sleep(2)
     finally:
         print("DONE")
-        processor.stop_video()
+        # processor.stop_video()
         cv.destroyAllWindows()
         # await jsm.shutdown()
 

@@ -44,45 +44,10 @@ class CameraCalibrator:
         return dst
 
 
-class KinectProcessor:
-    def __init__(
-        self,
-        detection_model: str,
-        obb_model: str,
-        calibrator: CameraCalibrator,
-        sharpen_method: str = "kernel",
-        denoise_method: str = "median",
-    ) -> None:
-        self.detection_model = YOLO(detection_model)
-        self.obb_model: YOLO = YOLO(obb_model)
-        self.detection_labels = self.detection_model.names
-        self.obb_labels = self.obb_model.names
-        self.calibrator = calibrator
+class ImageProcessor:
+    def __init__(self, sharpen_method: str = "kernel", denoise_method: str = "median"):
         self.sharpen_method = sharpen_method
         self.denoise_method = denoise_method
-
-    @staticmethod
-    def get_depth() -> DepthMap:
-        depth, _ = freenect.sync_get_depth(format=DEPTH_MM)
-        return depth
-
-    @staticmethod
-    def get_video() -> ImageFrame:
-        return video_cv(freenect.sync_get_video()[0])
-
-    @staticmethod
-    def stop_video() -> None:
-        freenect.sync_stop()
-
-    @classmethod
-    def get_center_depth(cls, center_x, center_y) -> float:
-        depth_map = cls.get_depth()
-        height, width = depth_map.shape
-
-        if 0 <= center_x < width and 0 <= center_y < height:
-            return float(depth_map[center_y, center_x])
-        else:
-            return 0.0
 
     def denoise_frame(self, frame) -> ImageFrame:
         if self.denoise_method == "bilateral":
@@ -124,19 +89,6 @@ class KinectProcessor:
         else:
             raise ValueError("Invalid sharpen_method.  Use 'unsharp' or 'kernel'")
 
-    def get_real_world_coordinates(
-        self, pixel_x: int, pixel_y: int, depth: float
-    ) -> tuple:
-        # Convert pixel coordinates to normalized device coordinates
-        ndc_x = (pixel_x - self.calibrator.mtx[0, 2]) / self.calibrator.mtx[0, 0]
-        ndc_y = (pixel_y - self.calibrator.mtx[1, 2]) / self.calibrator.mtx[1, 1]
-
-        real_x = ndc_x * depth
-        real_y = ndc_y * depth
-        real_z = depth
-
-        return real_x, real_y, real_z
-
     def contrast_image(self, frame):
         alpha = 1.2
         beta = 0
@@ -174,20 +126,68 @@ class KinectProcessor:
         lab = cv.merge((le, a, b))
         return cv.cvtColor(lab, cv.COLOR_LAB2BGR)
 
+
+class DepthProcessor:
+    @staticmethod
+    def get_depth() -> DepthMap:
+        depth, _ = freenect.sync_get_depth(format=DEPTH_MM)
+        return depth
+
+    @staticmethod
+    def get_video() -> ImageFrame:
+        return video_cv(freenect.sync_get_video()[0])
+
+    @staticmethod
+    def stop_video() -> None:
+        freenect.sync_stop()
+
+    @classmethod
+    def get_center_depth(cls, center_x, center_y) -> float:
+        depth_map = cls.get_depth()
+        height, width = depth_map.shape
+
+        if 0 <= center_x < width and 0 <= center_y < height:
+            return float(depth_map[center_y, center_x])
+        else:
+            return 0.0
+
+    def get_real_world_coordinates(
+        self, pixel_x: int, pixel_y: int, depth: float, calibrator: CameraCalibrator
+    ) -> tuple:
+        # Convert pixel coordinates to normalized device coordinates
+        ndc_x = (pixel_x - calibrator.mtx[0, 2]) / calibrator.mtx[0, 0]
+        ndc_y = (pixel_y - calibrator.mtx[1, 2]) / calibrator.mtx[1, 1]
+
+        real_x = ndc_x * depth
+        real_y = ndc_y * depth
+        real_z = depth
+
+        return real_x, real_y, real_z
+
+
+class KinectProcessor:
+    def __init__(
+        self,
+        detection_model: str,
+        obb_model: str,
+        calibrator: CameraCalibrator,
+        sharpen_method: str = "kernel",
+        denoise_method: str = "median",
+    ) -> None:
+        self.detection_model = YOLO(detection_model)
+        self.obb_model: YOLO = YOLO(obb_model)
+        self.detection_labels = self.detection_model.names
+        self.obb_labels = self.obb_model.names
+        self.calibrator = calibrator
+        self.image_processor = ImageProcessor(sharpen_method, denoise_method)
+        self.depth_processor = DepthProcessor()
+
     def process_frame(self, frame):
-        # Undistory frame
+        # Undistort frame
         undistorted_frame = self.calibrator.undistort_frame(frame)
 
         # Enhance image
-        enhance_hdr = self.enhance_hdr(undistorted_frame)
-        # # Contrast frame
-        # constrated_frame = self.contrast_image(undistorted_frame)
-        #
-        # # Sharpen frame
-        # sharpened_frame = self.sharpen_frame(constrated_frame)
-
-        # Intensify_image
-        # intensified_image = self.intensify_image(undistorted_frame)
+        enhance_hdr = self.image_processor.enhance_hdr(undistorted_frame)
 
         return enhance_hdr
 
@@ -223,26 +223,15 @@ class KinectProcessor:
             center_y = int((y1 + y2) / 2)
 
             # Get distance based on center points
-            distance = self.get_center_depth(center_x, center_y)
+            distance = self.depth_processor.get_center_depth(center_x, center_y)
 
             # Draw center point on the frame
             # cv.circle(obb_frame, (center_x, center_y), 20, (0, 255, 0), -1)
 
-            real_x, real_y, real_z = self.get_real_world_coordinates(
-                center_x, center_y, distance
+            real_x, real_y, real_z = self.depth_processor.get_real_world_coordinates(
+                center_x, center_y, distance, self.calibrator
             )
 
-            # coord_data = {
-            #
-            #     "class_name": class_name,
-            #     "center": (center_x, center_y),
-            #     "distance_mm": float(distance),
-            #     "real_world_coords": {
-            #         "x_mm": float(real_x),
-            #         "y_mm": float(real_y),
-            #         "z_mm": float(real_z),
-            #     },
-            # }
             coord_data = [float(real_x), float(real_y), float(real_z)]
 
             object_coord_info[class_name] = np.array(coord_data)
@@ -261,6 +250,3 @@ class KinectProcessor:
 
         console.print(table)
         return object_coord_info
-
-    # async def send_coordinates(self, coordinates):
-    #     await self.js.publish("camera.collected", json.dumps(coordinates).encode())

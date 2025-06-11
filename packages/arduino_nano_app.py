@@ -12,7 +12,8 @@ from libs.nats.jetstream_manager import JetStreamManager
 def get_serial_port():
     ports = list_ports.comports()
     for port in ports:
-        if "Nano" in port.description:
+        print(port.description)
+        if "ttyACM0" in port.description:
             return port.device
     return None
 
@@ -57,17 +58,17 @@ async def main():
 
     # Ensure event stream exists
     await jsm.ensure_stream(
-        "camera_events",
-        subjects=["camera.*"],
+        "robot_events",
+        subjects=["robot.*"],  # e.g. robot.ik
         max_msgs=100_000,
     )
     #
-    await jsm.ensure_stream("camera_events", subjects=["camera.*"], max_msgs=100_100)
+    # await jsm.ensure_stream("camera_events", subjects=["camera.*"], max_msgs=100_100)
 
     sub = await jsm.create_consumer(
-        "camera.collected",
-        "camera_events",
-        "camera_processor",
+        "robot.ik",
+        "robot_events",
+        "robot_processor",
     )
 
     async for msg in jsm.process_messages(sub, batch_size=25):

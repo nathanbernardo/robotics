@@ -92,9 +92,9 @@ class KeurigObjects(BaseEnum):
     END_EFFECTOR = "end_effector"
 
 
-keurig_labels = ["4oz", "6oz"]
+keurig_labels = ["12oz", "keurig", "power_on", "water_handle", "platform"]
 
-print("true if string in Enum : ", "7oz" in KeurigObjects)
+# print("true if string in Enum : ", "7oz" in KeurigObjects)
 
 
 class StateMachine:
@@ -104,9 +104,12 @@ class StateMachine:
             State.CALIBRATING: self.calibrating,
             State.CALIBRATED: self.calibrated,
             State.PRESSING_POWER_BUTTON: self.pressing_power_button,
+            State.PRESSED_POWER_BUTTON: self.pressed_power_button,
+            State.GOING_HOME: self.going_home,
+            State.BACK_AT_HOME: self.back_at_home,
             State.STOPPED: self.stop,
         }
-        self.prev_action_state: State = State.STOPPED
+        self.prev_state: State = State.STOPPED
         self.lock: Lock = Lock()
         self.object_coord_camera_frame: Dict[str, npt.NDArray[np.float64]] = {}
         self.object_coord_robot_frame: Dict[str, npt.NDArray[np.float64]] = {}
@@ -116,6 +119,7 @@ class StateMachine:
             "./packages/urdf/chungus.URDF"
         )
         self.js: Optional[JetStreamContext] = js
+        self.cache_object_coord_data: Dict[str, npt.NDArray[np.float64]] = {}
 
     def get_current_state(self):
         print("[State Machine] Current state: ", self.state)
@@ -129,14 +133,14 @@ class StateMachine:
         for key, value in coord_data_camera_frame.items():
             if not isinstance(key, str) or key not in KeurigObjects:
                 raise ValueError(f"Invalid object key: {key}")
-            if not isinstance(value, np.ndarray) or value.shape != (3, 1):
+            if not isinstance(value, np.ndarray) or value.shape != (3,):
                 raise ValueError(
                     f"Invalid coordinate format for {key}: execpted 3x1 numpy array"
                 )
         logger.info(f"Coord data in camera frame: {coord_data_camera_frame}")
         self.object_coord_camera_frame = coord_data_camera_frame
 
-    def transform_coordinates(
+    def __transform_coordinates(
         self, camera_frame_coords: Dict[str, npt.NDArray[np.float64]]
     ) -> Dict[str, npt.NDArray[np.float64]]:
         """Transform  coordinates from camera frame to robot frame"""
@@ -158,27 +162,26 @@ class StateMachine:
         await self.states[self.state]()
 
     async def calibrating(self) -> None:
-        print("Calibrating robot...")
+        logger.info("Calibrating robot...")
         async with self.lock:
+            for key, value in self.object_coord_camera_frame.items():
+                if key in keurig_labels and key not in self.cache_object_coord_data:
+                    self.cache_object_coord_data[key] = value
 
-            for object in self.object_coord_camera_frame:
-                print(f"Object: {object}")
-                if object in ["4oz"]:
-                    self.mask = self.mask | 1
-            if self.mask == 1:
+            if len(self.cache_object_coord_data) == len(keurig_labels):
                 self.state = State.CALIBRATED
 
     async def calibrated(self) -> None:
         async with self.lock:
-            self.object_coord_robot_frame = self.transform_coordinates(
+            self.object_coord_robot_frame = self.__transform_coordinates(
                 self.object_coord_camera_frame
             )
             self.state = State.PRESSING_POWER_BUTTON
 
     async def pressing_power_button(self) -> None:
+        logger.info("Pressin power button...")
         async with self.lock:
-
-            power_on_target_position = self.object_coord_robot_frame["4oz"]
+            power_on_target_position = self.object_coord_robot_frame["12oz"]
             ik_results = self.robot_chain.inverse_kinematics(
                 power_on_target_position.reshape(1, 3)
             )
@@ -189,24 +192,33 @@ class StateMachine:
             )
             # Encode ik data
             encoded_data = json.dumps(ik_results_list).encode()
-            print("Publishing data to NATS: ", ik_results_list)
+            logger.info("Publishing data to NATS: ", ik_results_list)
             await self.js.publish("robot.ik", encoded_data)
             self.state = State.PRESSED_POWER_BUTTON
 
     async def pressed_power_button(self) -> None:
+        logger.info("Pressed power button")
         async with self.lock:
             self.state = State.GOING_HOME
 
     async def going_home(self) -> None:
+        logger.info("Going home...")
         async with self.lock:
-            self.state = State.BACK_AT_HOME
+            return
+            # match self.prev_state:
+            #     case State.PRESSED_POWER_BUTTON:
+            #         self.
+            #     case _:
+            #         return
+            #
+            # self.state = State.BACK_AT_HOME
 
     async def back_at_home(self) -> None:
+        logger.info("Back at home")
         async with self.lock:
             self.state = State.STOPPED
 
     async def run(self) -> None:
-        print("Running state machine...")
         await self.transition()
 
     async def stop(self) -> None:

@@ -12,8 +12,8 @@ def main():
         secret_key=MinioConfig.SECRET_KEY,
     )
 
-    obb_path = "./tmp/obb_2025_05_15.pt"
-    minio_client.download_file("ai-models", "obb_2025_05_15.pt", obb_path)
+    obb_path = "./tmp/obb_2025_05_21.pt"
+    minio_client.download_file("ai-models", "obb_2025_05_21.pt", obb_path)
 
     # Train model with new data
     model = YOLO(obb_path)

@@ -20,5 +20,5 @@ class ModelConfig(Config):
     )
     DETECTION_MODEL = "detect_coco128_200epochs.pt"
     DETECTION_MODEL_PATH = f"./tmp/{DETECTION_MODEL}"
-    OBB_MODEL = "obb_2025_05_13.pt"
+    OBB_MODEL = "obb_2025_06_09.pt"
     OBB_MODEL_PATH = f"./tmp/{OBB_MODEL}"
